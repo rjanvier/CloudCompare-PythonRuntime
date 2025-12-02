@@ -24,14 +24,22 @@ if(PLUGIN_PYTHON)
   )
   mark_as_advanced(PLUGIN_PYTHON_USE_EMBEDDED_MODULES)
 
-  if(WIN32)
+  if(APPLE)
+    option(PLUGIN_PYTHON_MACOS_BUNDLE_DISTRIBUTION
+           "Should the Python distribution be bundled in the .app on macOS"
+           ON
+    )
+    mark_as_advanced(PLUGIN_PYTHON_USE_EMBEDDED_MODULES)
+  endif()
+
+  if(WIN32 OR APPLE)
     option(PLUGIN_PYTHON_COPY_ENV
-           "Should the content of the current python site-package be copied on install"
+           "Should the content of the current python site-package be copied on install (for Windows and macOS bundles)"
            ON
     )
     mark_as_advanced(PLUGIN_PYTHON_COPY_ENV)
   endif()
-  
+
   add_subdirectory(wrapper)
   add_subdirectory(src)
 
@@ -49,8 +57,8 @@ if(PLUGIN_PYTHON)
   add_subdirectory(docs)
   add_subdirectory(installer)
 
-  if(WIN32)
-    manage_windows_install()
+  if(WIN32 OR PLUGIN_PYTHON_MACOS_BUNDLE_DISTRIBUTION)
+    manage_bundle_install()
   elseif(UNIX AND NOT APPLE)
     if(NOT PLUGIN_PYTHON_USE_EMBEDDED_MODULES)
       installsharedlibrary(TARGET cccorelib)

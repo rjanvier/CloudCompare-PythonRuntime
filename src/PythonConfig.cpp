@@ -183,7 +183,7 @@ void PythonConfig::initDefault()
 void PythonConfig::initBundled()
 {
 #if defined(Q_OS_MACOS)
-    const QString pythonEnvDirPath(QApplication::applicationDirPath() + "/../Resources/python");
+    const QString pythonEnvDirPath(QApplication::applicationDirPath() + "/python/");
 #else
     const QString pythonEnvDirPath(QApplication::applicationDirPath() + "/plugins/Python");
 #endif

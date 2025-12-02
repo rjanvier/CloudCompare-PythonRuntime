@@ -27,57 +27,76 @@ function(copy_python_env INSTALL_DIR)
         PYTHON_STDLIB:      ${Python_STDLIB}
         PYTHON_LIBRARIES:   ${Python_RUNTIME_LIBRARY_DIRS}"
   )
-  message(DEBUG "COPYING venv from ${Python_SITELIB}/ to ${INSTALL_DIR}/Lib/site-packages/")
-  install(DIRECTORY "${PYTHON_BASE_PREFIX}/" DESTINATION "${INSTALL_DIR}")
 
-  install(DIRECTORY "${Python_SITELIB}/"
-        DESTINATION "${INSTALL_DIR}/Lib/site-packages/"
-  )
+  if(WIN32)
+    message(DEBUG "COPYING venv from ${Python_SITELIB}/ to ${INSTALL_DIR}/Lib/site-packages/")
+    install(DIRECTORY "${PYTHON_BASE_PREFIX}/" DESTINATION "${INSTALL_DIR}")
+  endif()
+
+  if(APPLE)
+    install(PROGRAMS "${PYTHON_BASE_PREFIX}/bin/$<TARGET_FILE_NAME:Python::Interpreter>" DESTINATION "${INSTALL_DIR}/bin" RENAME python)
+    install(DIRECTORY "${Python_STDLIB}" DESTINATION "${INSTALL_DIR}/lib/")
+  endif()
+  
 endfunction()
 
-function(copy_python_dll)
+function(copy_python_libraries)
   message(
     DEBUG
     "Python DLL: = ${Python_RUNTIME_LIBRARY_DIRS}/python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}.dll"
   )
+  # TODO: starting from cmake 3.30, FindPython provides mechanism to handle multiconfig/debug libraries
+  # see the documentation
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-	message(STATUS "Debug build")
-	install(
-	  FILES "${Python_RUNTIME_LIBRARY_DIRS}/python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}_d.dll"
-		  # install the python3 base dll as well because some libs will try to
-		  # find it (PySide and PyQT for example)
-		  "${Python_RUNTIME_LIBRARY_DIRS}/python${Python_VERSION_MAJOR}_d.dll"
-	  DESTINATION ${CLOUDCOMPARE_DEST_FOLDER}
-	)
-  else()
-	install(
-	  FILES "${Python_RUNTIME_LIBRARY_DIRS}/python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}.dll"
+    message(STATUS "Debug build")
+    install(
+      FILES "${Python_RUNTIME_LIBRARY_DIRS}/python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}_d.dll"
           # install the python3 base dll as well because some libs will try to
           # find it (PySide and PyQT for example)
+          "${Python_RUNTIME_LIBRARY_DIRS}/python${Python_VERSION_MAJOR}_d.dll"
+      DESTINATION ${CLOUDCOMPARE_DEST_FOLDER}
+    )
+  else()
+    install(
+        FILES "${Python_RUNTIME_LIBRARY_DIRS}/python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}.dll"
+          # install the python3 base sll as well because some libs will try to
+          # find it (PySide and PyQT for example)
           "${Python_RUNTIME_LIBRARY_DIRS}/python${Python_VERSION_MAJOR}.dll"
-	  DESTINATION ${CLOUDCOMPARE_DEST_FOLDER}
-	)
+      DESTINATION ${CLOUDCOMPARE_DEST_FOLDER}
+    )
   endif()
 endfunction()
 
-function(manage_windows_install)
+# Manage install for Windows ans macOS bundles
+function(manage_bundle_install)
 
+  message(STATUS " Python Exec: ${Python_EXECUTABLE}")
+
+  # Get the base prefix i.e. the full path of the python executable of the base installation
+  # in case of Venv / CONDA this point to the real Python base executable. 
   getset_python_base_prefix()
 
   if(PLUGIN_PYTHON_COPY_ENV)
     copy_python_env(${CC_PYTHON_INSTALL_DIR})
   endif()
 
-  copy_python_dll()
+  # on Windows we are responsible for copying the python DLL
+  # On macOS macdeployqt will do the work for us (and set the proper rpath)
+  if(WIN32)
+    copy_python_libraries()
+    set(DEST_PYTHON_SITELIB "${CC_PYTHON_INSTALL_DIR}/Lib/site-packages")
+  elseif( APPLE )
+    set(DEST_PYTHON_SITELIB "${CC_PYTHON_INSTALL_DIR}/lib/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}")
+  endif()
 
   install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/docs/stubfiles/pycc.pyi"
                 "${CMAKE_CURRENT_SOURCE_DIR}/docs/stubfiles/cccorelib.pyi"
-          DESTINATION "${CC_PYTHON_INSTALL_DIR}/Lib/site-packages"
+          DESTINATION "${DEST_PYTHON_SITELIB}"
   )
 
   if(NOT PLUGIN_PYTHON_USE_EMBEDDED_MODULES)
     install(TARGETS pycc cccorelib
-            DESTINATION "${CC_PYTHON_INSTALL_DIR}/Lib/site-packages"
+            DESTINATION "${DEST_PYTHON_SITELIB}"
     )
   endif()
 endfunction()
